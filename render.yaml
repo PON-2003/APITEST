@@ -11,11 +11,9 @@ services:
     buildFilter:
       paths:
         - APIBroo.py
-        - model/trash_classifier_model.h5
         - templates/index.html
     autoDeploy: true
 
 build:
   commands:
-    # ไม่ต้องมี pip install อีกในส่วนนี้ เพราะมันได้ระบุไว้ใน buildCommand ของ services แล้ว
-    - # pip install -r requirements.txt  # ตัดออก
+    # ไม่ต้องมีการติดตั้ง dependencies ซ้ำในที่นี้
