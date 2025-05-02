@@ -7,6 +7,7 @@ from io import BytesIO
 from PIL import Image
 import base64
 import requests
+import threading
 
 # ฟังก์ชันสำหรับดาวน์โหลดไฟล์จาก Google Drive
 def download_file_from_google_drive(file_id, destination):
@@ -130,9 +131,11 @@ def capture_image_from_camera():
     cap.release()
     cv2.destroyAllWindows()
 
+# รัน Flask และการจับภาพจากกล้องในกระบวนการแยก
 if __name__ == '__main__':
-    # เริ่มต้นการจับภาพจากกล้อง
-    capture_image_from_camera()
+    # เริ่มต้นการจับภาพจากกล้องในกระบวนการแยก
+    camera_thread = threading.Thread(target=capture_image_from_camera)
+    camera_thread.start()
     
     # เริ่มแอป Flask
-    # app.run(debug=True)  # ใช้แค่ในการรัน Flask API, ถ้าคุณต้องการรันในโหมด production ควรใช้ app.run(host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0', port=5000)
