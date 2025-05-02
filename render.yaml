@@ -17,4 +17,5 @@ services:
 
 build:
   commands:
-    - pip install -r requirements.txt  # ติดตั้ง dependencies จาก requirements.txt
+    # ไม่ต้องมี pip install อีกในส่วนนี้ เพราะมันได้ระบุไว้ใน buildCommand ของ services แล้ว
+    - # pip install -r requirements.txt  # ตัดออก
