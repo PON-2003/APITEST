@@ -14,3 +14,7 @@ services:
         - model/trash_classifier_model.h5
         - templates/index.html
     autoDeploy: true
+build:
+  commands:
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
