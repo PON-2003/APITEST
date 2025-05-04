@@ -10,12 +10,10 @@ import time
 app = Flask(__name__)
 CORS(app)
 
-# โหลดโมเดลเพียงครั้งเดียว
 interpreter = None
 class_names = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
 
-# โหลดโมเดล .tflite
-@app.before_first_request
+# โหลดโมเดลทันทีตอนเริ่มแอป
 def load_model():
     global interpreter
     try:
@@ -28,7 +26,8 @@ def load_model():
         print(f"[ERROR] Failed to load model: {e}")
         interpreter = None
 
-# ฟังก์ชันแปลง base64 เป็น OpenCV image
+load_model()
+
 def decode_image(img_base64):
     try:
         img_data = base64.b64decode(img_base64)
@@ -39,7 +38,6 @@ def decode_image(img_base64):
         print(f"[ERROR] Image decoding failed: {e}")
         return None
 
-# ฟังก์ชันทำนายผล
 def predict_on_frame(frame):
     h, w, _ = frame.shape
     box_size = 224
@@ -47,18 +45,14 @@ def predict_on_frame(frame):
     y1 = h // 2 - box_size // 2
     roi = frame[y1:y1+box_size, x1:x1+box_size]
 
-    img = cv2.resize(roi, (96, 96)) / 255.0  # ลดขนาดลงเพื่อประหยัด RAM
+    img = cv2.resize(roi, (96, 96)) / 255.0
     img = np.expand_dims(img, axis=0).astype(np.float32)
 
-    # TensorFlow Lite inference
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
-
-    # Set input tensor
     interpreter.set_tensor(input_details[0]['index'], img)
     interpreter.invoke()
 
-    # Get output tensor
     prediction = interpreter.get_tensor(output_details[0]['index'])
     class_index = int(np.argmax(prediction))
     confidence = float(np.max(prediction))
@@ -66,7 +60,6 @@ def predict_on_frame(frame):
     
     return class_label, confidence
 
-# Endpoint ทำนายผล
 @app.route("/predict", methods=["POST"])
 def predict():
     start_time = time.time()
