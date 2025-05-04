@@ -13,7 +13,7 @@ CORS(app)
 interpreter = None
 class_names = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
 
-# โหลดโมเดลทันทีตอนเริ่มแอป
+# โหลดโมเดลตอนเริ่มแอป
 def load_model():
     global interpreter
     try:
@@ -28,6 +28,7 @@ def load_model():
 
 load_model()
 
+# แปลง base64 เป็น OpenCV image
 def decode_image(img_base64):
     try:
         img_data = base64.b64decode(img_base64)
@@ -38,6 +39,7 @@ def decode_image(img_base64):
         print(f"[ERROR] Image decoding failed: {e}")
         return None
 
+# ฟังก์ชันทำนาย
 def predict_on_frame(frame):
     h, w, _ = frame.shape
     box_size = 224
@@ -45,21 +47,27 @@ def predict_on_frame(frame):
     y1 = h // 2 - box_size // 2
     roi = frame[y1:y1+box_size, x1:x1+box_size]
 
-    img = cv2.resize(roi, (96, 96)) / 255.0
+    # ตรวจสอบ input shape ที่โมเดลต้องการ
+    input_details = interpreter.get_input_details()
+    input_shape = input_details[0]['shape']  # ตัวอย่าง: [1, 150, 150, 3]
+    target_height, target_width = input_shape[1], input_shape[2]
+
+    # Resize และ normalize
+    img = cv2.resize(roi, (target_width, target_height)) / 255.0
     img = np.expand_dims(img, axis=0).astype(np.float32)
 
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
+    # ทำการทำนาย
     interpreter.set_tensor(input_details[0]['index'], img)
     interpreter.invoke()
 
-    prediction = interpreter.get_tensor(output_details[0]['index'])
+    prediction = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
     class_index = int(np.argmax(prediction))
     confidence = float(np.max(prediction))
     class_label = class_names[class_index]
-    
+
     return class_label, confidence
 
+# Endpoint ทำนาย
 @app.route("/predict", methods=["POST"])
 def predict():
     start_time = time.time()
@@ -91,9 +99,11 @@ def predict():
         "confidence": round(confidence, 4)
     })
 
+# หน้าหลัก
 @app.route("/")
 def home():
     return "<h1>Trash Classifier API</h1><p>Send POST to /predict with base64 image.</p>"
 
+# เริ่มแอป
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
