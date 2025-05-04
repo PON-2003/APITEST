@@ -11,20 +11,22 @@ app = Flask(__name__)
 CORS(app)
 
 # โหลดโมเดลเพียงครั้งเดียว
-model = None
+interpreter = None
 class_names = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
 
+# โหลดโมเดล .tflite
 @app.before_first_request
 def load_model():
-    global model
+    global interpreter
     try:
         print("[INFO] Loading model...")
-        model_path = os.path.join("model", "trash_classifier_model.h5")
-        model = tf.keras.models.load_model(model_path)
+        model_path = os.path.join("model", "trash_classifier_model.tflite")
+        interpreter = tf.lite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
         print("[INFO] Model loaded.")
     except Exception as e:
         print(f"[ERROR] Failed to load model: {e}")
-        model = None
+        interpreter = None
 
 # ฟังก์ชันแปลง base64 เป็น OpenCV image
 def decode_image(img_base64):
@@ -46,11 +48,20 @@ def predict_on_frame(frame):
     roi = frame[y1:y1+box_size, x1:x1+box_size]
 
     img = cv2.resize(roi, (96, 96)) / 255.0  # ลดขนาดลงเพื่อประหยัด RAM
-    img = np.expand_dims(img, axis=0)
-    prediction = model.predict(img, verbose=0)
+    img = np.expand_dims(img, axis=0).astype(np.float32)
+
+    # TensorFlow Lite inference
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
+    interpreter.set_tensor(input_details[0]['index'], img)
+    interpreter.invoke()
+
+    prediction = interpreter.get_tensor(output_details[0]['index'])
     class_index = int(np.argmax(prediction))
     confidence = float(np.max(prediction))
     class_label = class_names[class_index]
+    
     return class_label, confidence
 
 # Endpoint ทำนายผล
@@ -58,7 +69,7 @@ def predict_on_frame(frame):
 def predict():
     start_time = time.time()
 
-    if model is None:
+    if interpreter is None:
         return jsonify({"error": "Model not loaded."}), 500
 
     data = request.get_json()
