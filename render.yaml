@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: trash-classifier
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start.sh
+    autoDeploy: true
+    plan: free
