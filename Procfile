@@ -1,2 +1,1 @@
-web: gunicorn -w 6 -t 120 app:app
-
+web: gunicorn APIBroo:app --timeout 90

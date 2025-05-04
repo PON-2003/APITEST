@@ -11,11 +11,20 @@ app = Flask(__name__)
 CORS(app)
 
 # โหลดโมเดลเพียงครั้งเดียว
-print("[INFO] Loading model...")
-model_path = os.path.join("model", "trash_classifier_model.h5")
-model = tf.keras.models.load_model(model_path)
+model = None
 class_names = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
-print("[INFO] Model loaded.")
+
+@app.before_first_request
+def load_model():
+    global model
+    try:
+        print("[INFO] Loading model...")
+        model_path = os.path.join("model", "trash_classifier_model.h5")
+        model = tf.keras.models.load_model(model_path)
+        print("[INFO] Model loaded.")
+    except Exception as e:
+        print(f"[ERROR] Failed to load model: {e}")
+        model = None
 
 # ฟังก์ชันแปลง base64 เป็น OpenCV image
 def decode_image(img_base64):
@@ -36,23 +45,22 @@ def predict_on_frame(frame):
     y1 = h // 2 - box_size // 2
     roi = frame[y1:y1+box_size, x1:x1+box_size]
 
-    try:
-        img = cv2.resize(roi, (150, 150)) / 255.0
-    except Exception as e:
-        raise ValueError(f"Failed to resize image: {e}")
-
+    img = cv2.resize(roi, (96, 96)) / 255.0  # ลดขนาดลงเพื่อประหยัด RAM
     img = np.expand_dims(img, axis=0)
     prediction = model.predict(img, verbose=0)
-    class_index = np.argmax(prediction)
+    class_index = int(np.argmax(prediction))
     confidence = float(np.max(prediction))
     class_label = class_names[class_index]
-
     return class_label, confidence
 
 # Endpoint ทำนายผล
 @app.route("/predict", methods=["POST"])
 def predict():
     start_time = time.time()
+
+    if model is None:
+        return jsonify({"error": "Model not loaded."}), 500
+
     data = request.get_json()
     img_base64 = data.get("image")
 
@@ -69,8 +77,8 @@ def predict():
         print(f"[ERROR] Prediction failed: {e}")
         return jsonify({"error": str(e)}), 500
 
-    end_time = time.time()
-    print(f"[INFO] Prediction completed in {end_time - start_time:.2f} seconds")
+    elapsed = time.time() - start_time
+    print(f"[INFO] Prediction completed in {elapsed:.2f}s")
 
     return jsonify({
         "class": label,
