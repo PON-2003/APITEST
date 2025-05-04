@@ -54,9 +54,11 @@ def predict_on_frame(frame):
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
+    # Set input tensor
     interpreter.set_tensor(input_details[0]['index'], img)
     interpreter.invoke()
 
+    # Get output tensor
     prediction = interpreter.get_tensor(output_details[0]['index'])
     class_index = int(np.argmax(prediction))
     confidence = float(np.max(prediction))
