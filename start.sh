@@ -1,2 +1,3 @@
 #!/bin/bash
-gunicorn app:app
+web: gunicorn -w 1 -t 300 app:app
+

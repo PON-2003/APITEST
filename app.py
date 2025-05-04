@@ -5,16 +5,19 @@ import numpy as np
 import tensorflow as tf
 import base64
 import os
+import time
 
 app = Flask(__name__)
 CORS(app)
 
-# โหลดโมเดล
+# โหลดโมเดลเพียงครั้งเดียว
+print("[INFO] Loading model...")
 model_path = os.path.join("model", "trash_classifier_model.h5")
 model = tf.keras.models.load_model(model_path)
 class_names = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
+print("[INFO] Model loaded.")
 
-# ฟังก์ชันแปลง base64 -> cv2 image
+# ฟังก์ชันแปลง base64 เป็น OpenCV image
 def decode_image(img_base64):
     try:
         img_data = base64.b64decode(img_base64)
@@ -27,9 +30,6 @@ def decode_image(img_base64):
 
 # ฟังก์ชันทำนายผล
 def predict_on_frame(frame):
-    if frame is None:
-        raise ValueError("Empty frame received for prediction.")
-    
     h, w, _ = frame.shape
     box_size = 224
     x1 = w // 2 - box_size // 2
@@ -42,24 +42,20 @@ def predict_on_frame(frame):
         raise ValueError(f"Failed to resize image: {e}")
 
     img = np.expand_dims(img, axis=0)
-
-    prediction = model.predict(img)
+    prediction = model.predict(img, verbose=0)
     class_index = np.argmax(prediction)
-    class_label = class_names[class_index]
     confidence = float(np.max(prediction))
+    class_label = class_names[class_index]
 
-    cv2.rectangle(frame, (x1, y1), (x1+box_size, y1+box_size), (0, 255, 0), 2)
-    cv2.putText(frame, f"{class_label} ({confidence:.2f})", (x1, y1-10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    return class_label, confidence
 
-    return frame, class_label, confidence
-
-# API สำหรับรับภาพ base64 และทำนายผล
-@app.route("/predict", methods=['POST'])
+# Endpoint ทำนายผล
+@app.route("/predict", methods=["POST"])
 def predict():
+    start_time = time.time()
     data = request.get_json()
     img_base64 = data.get("image")
-    
+
     if not img_base64:
         return jsonify({"error": "No image provided"}), 400
 
@@ -68,18 +64,17 @@ def predict():
         return jsonify({"error": "Invalid or corrupted image base64"}), 400
 
     try:
-        frame, label, confidence = predict_on_frame(frame)
+        label, confidence = predict_on_frame(frame)
     except Exception as e:
         print(f"[ERROR] Prediction failed: {e}")
-        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
-    _, buffer = cv2.imencode('.jpg', frame)
-    result_base64 = base64.b64encode(buffer).decode('utf-8')
+    end_time = time.time()
+    print(f"[INFO] Prediction completed in {end_time - start_time:.2f} seconds")
 
     return jsonify({
         "class": label,
-        "confidence": round(confidence, 4),
-        "image_base64": result_base64
+        "confidence": round(confidence, 4)
     })
 
 @app.route("/")
@@ -87,4 +82,4 @@ def home():
     return "<h1>Trash Classifier API</h1><p>Send POST to /predict with base64 image.</p>"
 
 if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
