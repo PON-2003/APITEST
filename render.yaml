@@ -6,3 +6,6 @@ services:
     startCommand: bash start.sh
     autoDeploy: true
     plan: free
+    envVars:
+      - key: PORT
+        value: "10000"

@@ -63,7 +63,12 @@ def predict_on_frame(frame):
     prediction = interpreter.get_tensor(interpreter.get_output_details()[0]['index'])
     class_index = int(np.argmax(prediction))
     confidence = float(np.max(prediction))
-    class_label = class_names[class_index]
+
+    # หากความมั่นใจต่ำกว่า 0.70 ให้คืนค่า "No" หรือคลาสที่ไม่ได้ระบุ
+    if confidence < 0.70:
+        class_label = "No"
+    else:
+        class_label = class_names[class_index]
 
     return class_label, confidence
 
