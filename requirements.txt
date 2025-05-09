@@ -1,15 +1,8 @@
-<<<<<<< HEAD
 Flask==2.2.5
-opencv-python-headless
-tensorflow
-gunicorn
-numpy
-flask-cors
-=======
-Flask==2.0.2
-requests==2.25.1
 tensorflow==2.18.0
 numpy==1.23.3
-opencv-python==4.5.5.64
+opencv-python-headless
 Pillow==8.4.0
->>>>>>> 5eb1b6e (Update TensorFlow version in requirements.txt)
+gunicorn
+flask-cors
+requests==2.25.1
