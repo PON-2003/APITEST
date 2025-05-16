@@ -39,24 +39,32 @@ def decode_image(img_base64):
         print(f"[ERROR] Image decoding failed: {e}")
         return None
 
-# ฟังก์ชันทำนาย
+# แปลง OpenCV image เป็น base64
+def encode_image(img):
+    _, buffer = cv2.imencode('.jpg', img)
+    return base64.b64encode(buffer).decode('utf-8')
+
+# ฟังก์ชันทำนายพร้อมวาดกรอบและ label
 def predict_on_frame(frame):
     h, w, _ = frame.shape
     box_size = 224
     x1 = w // 2 - box_size // 2
     y1 = h // 2 - box_size // 2
-    roi = frame[y1:y1+box_size, x1:x1+box_size]
+    x2 = x1 + box_size
+    y2 = y1 + box_size
 
-    # ตรวจสอบ input shape ที่โมเดลต้องการ
+    # วาดกรอบสีเขียวรอบ ROI
+    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+    roi = frame[y1:y2, x1:x2]
+
     input_details = interpreter.get_input_details()
-    input_shape = input_details[0]['shape']  # ตัวอย่าง: [1, 150, 150, 3]
+    input_shape = input_details[0]['shape']
     target_height, target_width = input_shape[1], input_shape[2]
 
-    # Resize และ normalize
     img = cv2.resize(roi, (target_width, target_height)) / 255.0
     img = np.expand_dims(img, axis=0).astype(np.float32)
 
-    # ทำการทำนาย
     interpreter.set_tensor(input_details[0]['index'], img)
     interpreter.invoke()
 
@@ -64,13 +72,13 @@ def predict_on_frame(frame):
     class_index = int(np.argmax(prediction))
     confidence = float(np.max(prediction))
 
-    # หากความมั่นใจต่ำกว่า 0.70 ให้คืนค่า "No" หรือคลาสที่ไม่ได้ระบุ
-    if confidence < 0.70:
-        class_label = "No"
-    else:
-        class_label = class_names[class_index]
+    class_label = class_names[class_index] if confidence >= 0.70 else "No"
 
-    return class_label, confidence
+    # วาด label ลงบนภาพ
+    label_text = f"{class_label} ({confidence:.2f})" if class_label != "No" else "Uncertain"
+    cv2.putText(frame, label_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+    return class_label, confidence, frame
 
 # Endpoint ทำนาย
 @app.route("/predict", methods=["POST"])
@@ -91,7 +99,8 @@ def predict():
         return jsonify({"error": "Invalid or corrupted image base64"}), 400
 
     try:
-        label, confidence = predict_on_frame(frame)
+        label, confidence, framed_img = predict_on_frame(frame)
+        framed_base64 = encode_image(framed_img)
     except Exception as e:
         print(f"[ERROR] Prediction failed: {e}")
         return jsonify({"error": str(e)}), 500
@@ -101,7 +110,8 @@ def predict():
 
     return jsonify({
         "class": label,
-        "confidence": round(confidence, 4)
+        "confidence": round(confidence, 4),
+        "framed_image": framed_base64
     })
 
 # หน้าหลัก
